@@ -1,5 +1,8 @@
+from __future__ import annotations
 import sqlite3
 from pathlib import Path
+from typing import Iterable, Tuple, List, Any
+
 
 class DBManager:
     def __init__(self, db_path: str | Path):
@@ -33,9 +36,9 @@ class DBManager:
                 (titulo, autor, ano, preco)
             )
             conn.commit()
-            return cur.rowcount 
+            return cur.rowcount
 
-    def get_all_books(self):
+    def get_all_books(self) -> List[Tuple[int, str, str, int, float]]:
         with sqlite3.connect(self.db_path) as conn:
             return conn.execute(
                 "SELECT id, titulo, autor, ano_publicacao, preco FROM livros ORDER BY id"
@@ -56,7 +59,7 @@ class DBManager:
             conn.commit()
             return cur.rowcount
 
-    def find_books_by_author(self, termo: str):
+    def find_books_by_author(self, termo: str) -> List[Tuple[int, str, str, int, float]]:
         like = f"%{termo}%"
         with sqlite3.connect(self.db_path) as conn:
             return conn.execute(

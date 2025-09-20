@@ -2,10 +2,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from lib.db import DBManager
-from lib.file_manager import FileManager
+from lib.file_manager import FileManager, import_from_csv
 from lib.validators import validate_text, validate_year, validate_price, ValidationError
 from lib.reporting import generate_html_report, generate_pdf_report
 from lib.utils import input_int, input_float, input_nonempty
+
 
 class LivrariaCLI:
     def __init__(self):
@@ -13,15 +14,36 @@ class LivrariaCLI:
         self.file_manager = FileManager(BASE_DIR)
         self.db_manager = DBManager(str(self.file_manager.db_path))
 
+    # ------------------------------
+    # CRUD básico
+    # ------------------------------
     def adicionar_livro(self) -> None:
         print("\n=== Adicionar novo livro ===")
-        titulo = input_nonempty("Título: ")
-        autor = input_nonempty("Autor: ")
-        ano = input_int("Ano de publicação: ")
-        preco = input_float("Preço (ex.: 39.90): ")
-        self.file_manager.backup_db()
-        self.db_manager.add_book(titulo, autor, ano, preco)
-        print("✔ Livro adicionado com sucesso!")
+        try:
+            # coleta
+            titulo_raw = input_nonempty("Título: ")
+            autor_raw = input_nonempty("Autor: ")
+            ano_raw = input_nonempty("Ano de publicação: ")
+            preco_raw = input_nonempty("Preço (ex.: 39.90): ")
+
+            # valida/normaliza
+            titulo = validate_text("Título", titulo_raw)
+            autor = validate_text("Autor", autor_raw)
+            ano = validate_year("Ano de publicação", ano_raw)
+            # aceita vírgula decimal
+            preco = validate_price("Preço", str(preco_raw).replace(",", ".").strip())
+
+            # alterações persistentes -> backup
+            self.file_manager.backup_db()
+            inserted = self.db_manager.add_book(titulo, autor, ano, preco)
+            if inserted:
+                print("✔ Livro adicionado com sucesso!")
+            else:
+                print("⚠ Livro possivelmente duplicado (mesmo título, autor e ano). Não inserido.")
+        except ValidationError as e:
+            print(f"⚠ Dados inválidos: {e}")
+        except Exception as e:
+            print(f"⚠ Erro ao adicionar: {e}")
 
     def exibir_livros(self) -> None:
         print("\n=== Todos os livros ===")
@@ -34,13 +56,19 @@ class LivrariaCLI:
     def atualizar_preco(self) -> None:
         print("\n=== Atualizar preço de um livro ===")
         livro_id = input_int("ID do livro: ")
-        novo_preco = input_float("Novo preço: ")
-        self.file_manager.backup_db()
-        updated_count = self.db_manager.update_price(livro_id, novo_preco)
-        if updated_count == 0:
-            print("⚠ ID não encontrado.")
-        else:
-            print("✔ Preço atualizado com sucesso!")
+        novo_preco_raw = input_nonempty("Novo preço: ")
+        try:
+            novo_preco = validate_price("Preço", str(novo_preco_raw).replace(",", ".").strip())
+            self.file_manager.backup_db()
+            updated_count = self.db_manager.update_price(livro_id, novo_preco)
+            if updated_count == 0:
+                print("⚠ ID não encontrado.")
+            else:
+                print("✔ Preço atualizado com sucesso!")
+        except ValidationError as e:
+            print(f"⚠ Valor inválido: {e}")
+        except Exception as e:
+            print(f"⚠ Erro ao atualizar: {e}")
 
     def remover_livro(self) -> None:
         print("\n=== Remover um livro ===")
@@ -61,6 +89,9 @@ class LivrariaCLI:
             return
         self._print_books(rows)
 
+    # ------------------------------
+    # CSV (export/import)
+    # ------------------------------
     def exportar_csv(self) -> None:
         print("\n=== Exportar dados para CSV ===")
         books = self.db_manager.get_all_books()
@@ -71,27 +102,25 @@ class LivrariaCLI:
         print("\n=== Importar dados a partir de CSV ===")
         caminho = input_nonempty("Informe o caminho do CSV (ex.: exports/livros_exportados.csv): ")
         try:
-            csv_data = self.file_manager.get_csv_data(caminho)
+            # usa o importador robusto com validações
             self.file_manager.backup_db()
-            inseridos = 0
-            for row in csv_data:
-                try:
-                    titulo = (row.get("titulo") or "").strip()
-                    autor = (row.get("autor") or "").strip()
-                    ano = int((row.get("ano_publicacao") or "0").strip())
-                    preco = float((row.get("preco") or "0").replace(",", ".").strip())
-                    if not titulo or not autor or ano <= 0 or preco < 0:
-                        raise ValueError
-                    # add_book retorna 1 se inseriu e 0 se ignorou (duplicata)
-                    inseridos += self.db_manager.add_book(titulo, autor, ano, preco) or 0
-                except (ValueError, KeyError):
-                    print(f"⚠ Ignorando linha com dados inválidos: {row}")
-            print(f"✔ Importação concluída. Inseridos: {inseridos}")
+            inseridos, ignorados, erros = import_from_csv(self.db_manager, caminho)
+            print(f"✔ Importação concluída. Inseridos: {inseridos} | Ignorados: {ignorados}")
+            if erros:
+                print("— Erros encontrados:")
+                # mostra até 10 para não poluir o terminal
+                for msg in erros[:10]:
+                    print("  •", msg)
+                if len(erros) > 10:
+                    print(f"  • (+{len(erros)-10} outros)")
         except FileNotFoundError as e:
             print(f"⚠ {e}")
         except Exception as e:
             print(f"⚠ Erro durante a importação: {e}")
 
+    # ------------------------------
+    # Backups
+    # ------------------------------
     def fazer_backup_manual(self) -> None:
         path = self.file_manager.backup_db()
         print(f"✔ Backup criado: {path.name}")
@@ -101,27 +130,41 @@ class LivrariaCLI:
         for b in backups:
             print(" -", b.name)
 
+    # ------------------------------
+    # Relatórios
+    # ------------------------------
+    def gerar_relatorio_html(self) -> None:
+        books = self.db_manager.get_all_books()
+        out = self.file_manager.exports_dir / "relatorio_livros.html"
+        try:
+            path = generate_html_report(books, str(out))
+            print(f"✔ Relatório HTML gerado em: {path}")
+        except Exception as e:
+            print(f"⚠ Erro ao gerar HTML: {e}")
+
+    def gerar_relatorio_pdf(self) -> None:
+        books = self.db_manager.get_all_books()
+        out = self.file_manager.exports_dir / "relatorio_livros.pdf"
+        try:
+            path = generate_pdf_report(books, str(out))
+            print(f"✔ Relatório PDF gerado em: {path}")
+        except ImportError as e:
+            print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install reportlab`.")
+        except Exception as e:
+            print(f"⚠ Erro ao gerar PDF: {e}")
+
+    # ------------------------------
+    # Utilitário de impressão
+    # ------------------------------
     def _print_books(self, rows: list):
         print(f"{'ID':<4} {'TÍTULO':<30} {'AUTOR':<22} {'ANO':<6} {'PREÇO':>8}")
         print("-"*76)
         for _id, titulo, autor, ano, preco in rows:
             print(f"{_id:<4} {titulo[:30]:<30} {autor[:22]:<22} {ano:<6} R$ {preco:>7.2f}")
 
-    def gerar_relatorio_html(self) -> None:
-        books = self.db_manager.get_all_books()
-        out = self.file_manager.exports_dir / "relatorio_livros.html"
-        path = generate_html_report(books, out)
-        print(f"✔ Relatório HTML gerado em: {path}")
-
-    def gerar_relatorio_pdf(self) -> None:
-        books = self.db_manager.get_all_books()
-        out = self.file_manager.exports_dir / "relatorio_livros.pdf"
-        try:
-            path = generate_pdf_report(books, out)
-            print(f"✔ Relatório PDF gerado em: {path}")
-        except Exception as e:
-            print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install reportlab`.")
-
+    # ------------------------------
+    # Menu
+    # ------------------------------
     def menu(self) -> None:
         while True:
             print("\n=== Sistema de Gerenciamento de Livraria ===")
@@ -146,20 +189,19 @@ class LivrariaCLI:
                 "5": self.buscar_por_autor,
                 "6": self.exportar_csv,
                 "7": self.importar_csv,
-                "8": self.fazer_backup_manual
+                "8": self.fazer_backup_manual,
+                "9": self.gerar_relatorio_html,
+                "10": self.gerar_relatorio_pdf,
             }
 
             if opcao in actions:
                 actions[opcao]()
-            elif opcao == "9":
-                self.gerar_relatorio_html()
-            elif opcao == "10":
-                self.gerar_relatorio_pdf()
             elif opcao == "11":
                 print("Até mais!")
                 break
             else:
                 print("Opção inválida. Tente novamente.")
+
 
 if __name__ == "__main__":
     cli = LivrariaCLI()
