@@ -3,7 +3,7 @@ from .validators import validate_text, validate_year, validate_price, Validation
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Any, Iterable, Mapping, Optional
+from typing import List, Tuple, Any, Mapping, Optional
 
 
 class FileManager:
@@ -84,7 +84,7 @@ class FileManager:
         try:
             return csv.Sniffer().sniff(sample_text, delimiters=",;\t|")
         except Exception:
-            return csv.excel  
+            return csv.excel
 
     def export_to_csv(self, books: List[Tuple], outfile_name: str = "livros_exportados.csv") -> Path:
         """
@@ -173,7 +173,6 @@ def import_from_csv(db, csv_path: str):
         col_autor = pick("autor", "author")
         col_ano = pick("ano_publicacao", "ano", "year")
         col_preco = pick("preco", "price")
-        col_id = pick("id")
 
         missing = [name for name, col in {
             "titulo": col_titulo, "autor": col_autor, "ano_publicacao": col_ano, "preco": col_preco

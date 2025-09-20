@@ -1,10 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
 from lib.db import DBManager
-from lib.file_manager import FileManager, import_from_csv
+from lib.file_manager import FileManager
 from lib.validators import validate_text, validate_year, validate_price, ValidationError
-from lib.reporting import generate_html_report, generate_pdf_report
 from lib.utils import input_int, input_float, input_nonempty
+from lib.reporting import generate_html_report, generate_pdf_report
 
 
 class LivrariaCLI:
@@ -22,7 +22,7 @@ class LivrariaCLI:
             preco_raw = input_nonempty("Preço (ex.: 39.90): ")
 
             titulo = validate_text("Título", titulo_raw)
-            autor = validate_text("Autor", autor_raw)
+            autor = validate_text("Autor", autor_raw)  # Garantir autor correto
             ano = validate_year("Ano de publicação", ano_raw)
             preco = validate_price("Preço", str(preco_raw).replace(",", ".").strip())
 
@@ -34,6 +34,7 @@ class LivrariaCLI:
                 print("⚠ Livro possivelmente duplicado (mesmo título, autor e ano). Não inserido.")
         except ValidationError as e:
             print(f"⚠ Dados inválidos: {e}")
+            return
         except Exception as e:
             print(f"⚠ Erro ao adicionar: {e}")
 
@@ -43,7 +44,9 @@ class LivrariaCLI:
         if not rows:
             print("(vazio)")
             return
-        self._print_books(rows)
+        print('ID   TÍTULO                         AUTOR                  ANO    PREÇO')
+        for _id, titulo, autor, ano, preco in rows:
+            print(f"{_id:<4} {titulo:<30} {autor:<22} {ano:<6} R$   {preco:>.2f}")
 
     def atualizar_preco(self) -> None:
         print("\n=== Atualizar preço de um livro ===")
@@ -79,7 +82,9 @@ class LivrariaCLI:
         if not rows:
             print("Nenhum livro encontrado para esse autor.")
             return
-        self._print_books(rows)
+        print('ID   TÍTULO                         AUTOR                  ANO    PREÇO')
+        for _id, titulo, autor, ano, preco in rows:
+            print(f"{_id:<4} {titulo:<30} {autor:<22} {ano:<6} R$   {preco:>.2f}")
 
     def exportar_csv(self) -> None:
         print("\n=== Exportar dados para CSV ===")
@@ -90,9 +95,27 @@ class LivrariaCLI:
     def importar_csv(self) -> None:
         print("\n=== Importar dados a partir de CSV ===")
         caminho = input_nonempty("Informe o caminho do CSV (ex.: exports/livros_exportados.csv): ")
+
+        inseridos = 0
+        ignorados = 0
+        erros = []
+
         try:
+            csv_data = self.file_manager.get_csv_data(caminho)
             self.file_manager.backup_db()
-            inseridos, ignorados, erros = import_from_csv(self.db_manager, caminho)
+
+            for i, row in enumerate(csv_data, start=1):
+                try:
+                    titulo = validate_text("Título", row.get("titulo") or row.get("title", ""))
+                    autor = validate_text("Autor", row.get("autor") or row.get("author", ""))
+                    ano = validate_year("Ano de publicação", row.get("ano_publicacao") or row.get("ano") or row.get("year", ""))
+                    preco = validate_price("Preço", row.get("preco") or row.get("price", ""))
+                    self.db_manager.add_book(titulo, autor, ano, preco)
+                    inseridos += 1
+                except (ValidationError, KeyError) as e:
+                    ignorados += 1
+                    erros.append(f"Linha {i}: {e}")
+
             print(f"✔ Importação concluída. Inseridos: {inseridos} | Ignorados: {ignorados}")
             if erros:
                 print("— Erros encontrados:")
@@ -100,8 +123,9 @@ class LivrariaCLI:
                     print("  •", msg)
                 if len(erros) > 10:
                     print(f"  • (+{len(erros)-10} outros)")
-        except FileNotFoundError as e:
-            print(f"⚠ {e}")
+
+        except FileNotFoundError:
+            print("⚠ Arquivo não encontrado.")
         except Exception as e:
             print(f"⚠ Erro durante a importação: {e}")
 
@@ -118,7 +142,7 @@ class LivrariaCLI:
         books = self.db_manager.get_all_books()
         out = self.file_manager.exports_dir / "relatorio_livros.html"
         try:
-            path = generate_html_report(books, str(out))
+            path = generate_html_report(books, out)
             print(f"✔ Relatório HTML gerado em: {path}")
         except Exception as e:
             print(f"⚠ Erro ao gerar HTML: {e}")
@@ -127,18 +151,12 @@ class LivrariaCLI:
         books = self.db_manager.get_all_books()
         out = self.file_manager.exports_dir / "relatorio_livros.pdf"
         try:
-            path = generate_pdf_report(books, str(out))
+            path = generate_pdf_report(books, out)
             print(f"✔ Relatório PDF gerado em: {path}")
         except ImportError as e:
             print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install reportlab`.")
         except Exception as e:
             print(f"⚠ Erro ao gerar PDF: {e}")
-
-    def _print_books(self, rows: list):
-        print(f"{'ID':<4} {'TÍTULO':<30} {'AUTOR':<22} {'ANO':<6} {'PREÇO':>8}")
-        print("-"*76)
-        for _id, titulo, autor, ano, preco in rows:
-            print(f"{_id:<4} {titulo[:30]:<30} {autor[:22]:<22} {ano:<6} R$ {preco:>7.2f}")
 
     def menu(self) -> None:
         while True:
