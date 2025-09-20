@@ -154,7 +154,8 @@ class LivrariaCLI:
             path = generate_pdf_report(books, out)
             print(f"✔ Relatório PDF gerado em: {path}")
         except ImportError as e:
-            print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install reportlab`.")
+            # A nova mensagem de erro reflete a mudança para xhtml2pdf
+            print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install xhtml2pdf`.")
         except Exception as e:
             print(f"⚠ Erro ao gerar PDF: {e}")
 

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório de Livros</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial; background: #ffffff; color: #000000; }
+  .wrap { max-width: 1100px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 28px; margin: 0 0 12px; }
+  .meta { color: #555555; margin-bottom: 24px; font-size: 14px; }
+  .card { background: #f0f0f0; border: 1px solid #cccccc; border-radius: 16px; padding: 18px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-weight: 600; font-size: 14px; color: #000000; border-bottom: 1px solid #999999; padding: 10px 8px; }
+  tbody td { border-bottom: 1px solid #dddddd; padding: 12px 8px; font-size: 14px; }
+  tbody tr:hover { background: #f9f9f9; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e0e0e0; color: #000000; font-size: 12px; border: 1px solid #cccccc; }
+  .ft { margin-top: 12px; color: #555555; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Relatório de Livros</h1>
+    <div class="meta">Gerado em <span class="badge">$generated_at</span> — Total: <span class="badge">$total</span></div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:80px">ID</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th style="width:140px">Ano</th>
+            <th style="width:140px">Preço (R$$)</th>
+          </tr>
+        </thead>
+        <tbody>
+          $rows
+        </tbody>
+      </table>
+      <div class="ft">Exportado pela CLI da Livraria</div>
+    </div>
+  </div>
+</body>
+</html>

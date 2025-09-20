@@ -1,11 +1,11 @@
-titulo,autor,ano_publicacao,preco
+id,titulo,autor,ano_publicacao,preco
 2,Dom Casmurro,Machado de Assis,1899,35.5
 3,O Alienista,Machado de Assis,1882,28.0
 4,Capitães da Areia,Jorge Amado,1937,42.9
 5,Grande Sertão: Veredas,João Guimarães Rosa,1956,55.0
-6,Memórias Póstumas de Brás Cubas,Machado de Assis,1881,33.25
 7,Vidas Secas,Graciliano Ramos,1938,38.9
 8,O Cortiço,Aluísio Azevedo,1890,31.0
 9,O Primo Basílio,José de Alencar,1878,29.5
 10,Macunaíma,Mário de Andrade,1928,27.9
 11,A Hora da Estrela,Clarice Lispector,1977,36.0
+12,Crepusculo,Stephen King,2006,199.0
