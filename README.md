@@ -37,3 +37,33 @@ Depois escolha **"7. Importar dados de CSV"** e informe o caminho (ex.: `exports
 - Os diretórios necessários são criados automaticamente na primeira execução.
 - Backups são feitos **automaticamente** antes de operações de escrita e também podem ser acionados manualmente (opção 8).
 - O sistema mantém apenas os **5** últimos arquivos em `backups/`.
+
+
+## Notas da versão (patch)
+- **Correção**: Exportação CSV agora ignora automaticamente a coluna `id` quando presente.
+- **Estrutura modular**: código organizado em `lib/` (`db.py`, `file_manager.py`, `utils.py`) + `main.py`.
+- **Teste**: há um `test_main.py` de exemplo (minimalista).
+
+### Rodando
+```bash
+python3 main.py
+```
+
+### Exportar/Importar CSV
+- Exporta para `exports/livros_exportados.csv`.
+- Importa de qualquer caminho válido; o sistema faz **backup automático** antes.
+
+
+## Extras implementados
+- **Validação de entradas**: texto (título/autor), ano (1400–2026), preço (0–1.000.000).
+- **Validação no CSV**: cada linha é checada; relatório de erros mostra linhas inválidas.
+- **Relatórios**:
+  - **HTML**: `exports/relatorio_livros.html` (com totais e média).
+  - **PDF**: `exports/relatorio_livros.pdf` (requer `reportlab` — instale com `pip install reportlab`).
+  - **Validação de entradas**: texto (título/autor), ano (1400–ano atual + 1), preço (0–1.000.000).
+
+### Opções do menu
+- **9** — Gerar relatório HTML
+- **10** — Gerar relatório PDF
+- **11** — Sair
+

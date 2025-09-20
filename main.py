@@ -1,14 +1,10 @@
-# file: main.py
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Sistema de Gerenciamento de Livraria (CLI)
-"""
 from __future__ import annotations
 from pathlib import Path
 
 from lib.db import DBManager
 from lib.file_manager import FileManager
+from lib.validators import validate_text, validate_year, validate_price, ValidationError
+from lib.reporting import generate_html_report, generate_pdf_report
 from lib.utils import input_int, input_float, input_nonempty
 
 class LivrariaCLI:
@@ -23,7 +19,6 @@ class LivrariaCLI:
         autor = input_nonempty("Autor: ")
         ano = input_int("Ano de publicação: ")
         preco = input_float("Preço (ex.: 39.90): ")
-        
         self.file_manager.backup_db()
         self.db_manager.add_book(titulo, autor, ano, preco)
         print("✔ Livro adicionado com sucesso!")
@@ -40,10 +35,8 @@ class LivrariaCLI:
         print("\n=== Atualizar preço de um livro ===")
         livro_id = input_int("ID do livro: ")
         novo_preco = input_float("Novo preço: ")
-        
         self.file_manager.backup_db()
         updated_count = self.db_manager.update_price(livro_id, novo_preco)
-        
         if updated_count == 0:
             print("⚠ ID não encontrado.")
         else:
@@ -52,10 +45,8 @@ class LivrariaCLI:
     def remover_livro(self) -> None:
         print("\n=== Remover um livro ===")
         livro_id = input_int("ID do livro: ")
-        
         self.file_manager.backup_db()
         removed_count = self.db_manager.remove_book(livro_id)
-        
         if removed_count == 0:
             print("⚠ ID não encontrado.")
         else:
@@ -64,7 +55,7 @@ class LivrariaCLI:
     def buscar_por_autor(self) -> None:
         print("\n=== Buscar livros por autor ===")
         termo = input_nonempty("Autor (termo de busca): ")
-        rows = self.db_manager.find_books_by_author(f"%{termo}%")
+        rows = self.db_manager.find_books_by_author(termo)
         if not rows:
             print("Nenhum livro encontrado para esse autor.")
             return
@@ -79,11 +70,9 @@ class LivrariaCLI:
     def importar_csv(self) -> None:
         print("\n=== Importar dados a partir de CSV ===")
         caminho = input_nonempty("Informe o caminho do CSV (ex.: exports/livros_exportados.csv): ")
-
         try:
             csv_data = self.file_manager.get_csv_data(caminho)
             self.file_manager.backup_db()
-            
             inseridos = 0
             for row in csv_data:
                 try:
@@ -93,13 +82,11 @@ class LivrariaCLI:
                     preco = float((row.get("preco") or "0").replace(",", ".").strip())
                     if not titulo or not autor or ano <= 0 or preco < 0:
                         raise ValueError
-                    self.db_manager.add_book(titulo, autor, ano, preco)
-                    inseridos += 1
+                    # add_book retorna 1 se inseriu e 0 se ignorou (duplicata)
+                    inseridos += self.db_manager.add_book(titulo, autor, ano, preco) or 0
                 except (ValueError, KeyError):
                     print(f"⚠ Ignorando linha com dados inválidos: {row}")
-            
             print(f"✔ Importação concluída. Inseridos: {inseridos}")
-            
         except FileNotFoundError as e:
             print(f"⚠ {e}")
         except Exception as e:
@@ -108,7 +95,8 @@ class LivrariaCLI:
     def fazer_backup_manual(self) -> None:
         path = self.file_manager.backup_db()
         print(f"✔ Backup criado: {path.name}")
-        backups = sorted(self.file_manager.backup_dir.glob('backup_livraria_*.db'), key=lambda p: p.stat().st_mtime, reverse=True)[:5]
+        backups = sorted(self.file_manager.backup_dir.glob('backup_livraria_*.db'),
+                         key=lambda p: p.stat().st_mtime, reverse=True)[:5]
         print("Backups recentes:")
         for b in backups:
             print(" -", b.name)
@@ -118,6 +106,21 @@ class LivrariaCLI:
         print("-"*76)
         for _id, titulo, autor, ano, preco in rows:
             print(f"{_id:<4} {titulo[:30]:<30} {autor[:22]:<22} {ano:<6} R$ {preco:>7.2f}")
+
+    def gerar_relatorio_html(self) -> None:
+        books = self.db_manager.get_all_books()
+        out = self.file_manager.exports_dir / "relatorio_livros.html"
+        path = generate_html_report(books, out)
+        print(f"✔ Relatório HTML gerado em: {path}")
+
+    def gerar_relatorio_pdf(self) -> None:
+        books = self.db_manager.get_all_books()
+        out = self.file_manager.exports_dir / "relatorio_livros.pdf"
+        try:
+            path = generate_pdf_report(books, out)
+            print(f"✔ Relatório PDF gerado em: {path}")
+        except Exception as e:
+            print(f"⚠ Não foi possível gerar PDF: {e}\nDica: instale com `pip install reportlab`.")
 
     def menu(self) -> None:
         while True:
@@ -130,9 +133,11 @@ class LivrariaCLI:
             print("6. Exportar dados para CSV")
             print("7. Importar dados de CSV")
             print("8. Fazer backup do banco de dados")
-            print("9. Sair")
+            print("9. Gerar relatório HTML")
+            print("10. Gerar relatório PDF")
+            print("11. Sair")
             opcao = input("Escolha uma opção: ").strip()
-            
+
             actions = {
                 "1": self.adicionar_livro,
                 "2": self.exibir_livros,
@@ -147,6 +152,10 @@ class LivrariaCLI:
             if opcao in actions:
                 actions[opcao]()
             elif opcao == "9":
+                self.gerar_relatorio_html()
+            elif opcao == "10":
+                self.gerar_relatorio_pdf()
+            elif opcao == "11":
                 print("Até mais!")
                 break
             else:
