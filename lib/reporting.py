@@ -1,21 +1,14 @@
-# lib/reporting.py
 from __future__ import annotations
-
 import os
 from datetime import datetime
 from string import Template
-from typing import Iterable, Sequence, Mapping, Any, List, Tuple
+from typing import Iterable, Sequence, Mapping, Any, List
 
-# -----------------------------------------------------------------------------
-# Helper: normaliza o formato dos livros para dicionários com chaves padrão
-# Aceita tuplas/listas (id, titulo, autor, ano_publicacao, preco) ou dicts.
-# -----------------------------------------------------------------------------
 def _normalize_books(books: Iterable[Any]) -> List[dict]:
     normalized: List[dict] = []
     for item in books:
         if isinstance(item, Mapping):
             d = dict(item)
-            # normaliza nomes de chaves comuns
             key_map = {
                 "id": "id",
                 "titulo": "titulo",
@@ -48,7 +41,6 @@ def _normalize_books(books: Iterable[Any]) -> List[dict]:
                 "preco": item[4],
             })
         else:
-            # formato inesperado: tenta o possível, mas não quebra
             normalized.append({
                 "id": getattr(item, "id", None),
                 "titulo": getattr(item, "titulo", None),
@@ -57,7 +49,6 @@ def _normalize_books(books: Iterable[Any]) -> List[dict]:
                 "preco": getattr(item, "preco", None),
             })
     return normalized
-
 
 HTML_TEMPLATE = Template("""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -107,21 +98,13 @@ HTML_TEMPLATE = Template("""<!DOCTYPE html>
 </html>
 """)
 
-
 def _row_html(cells: Sequence[str]) -> str:
     return "<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>"
 
-
 def generate_html_report(books: Iterable[Any], outfile: str = "exports/relatorio_livros.html") -> str:
-    """
-    Gera um relatório HTML bonito e responsivo com a listagem de livros.
-    Retorna o caminho final do arquivo salvo.
-    """
     os.makedirs(os.path.dirname(outfile) or ".", exist_ok=True)
-
     normalized = _normalize_books(books)
     rows = []
-
     for b in normalized:
         id_ = b.get("id", "")
         titulo = b.get("titulo", "") or ""
@@ -130,27 +113,16 @@ def generate_html_report(books: Iterable[Any], outfile: str = "exports/relatorio
         preco = b.get("preco", "")
         preco_str = f"{float(preco):.2f}".replace(".", ",") if isinstance(preco, (int, float)) else (str(preco) or "")
         rows.append(_row_html([str(id_), titulo, autor, str(ano), preco_str]))
-
     html = HTML_TEMPLATE.substitute(
         generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
         total=len(normalized),
         rows="\n".join(rows),
     )
-
     with open(outfile, "w", encoding="utf-8") as f:
         f.write(html)
-
     return os.path.abspath(outfile)
 
-
-# -----------------------------------------------------------------------------
-# PDF opcional (só se 'reportlab' estiver instalado)
-# -----------------------------------------------------------------------------
 def generate_pdf_report(books: Iterable[Any], outfile: str = "exports/relatorio_livros.pdf") -> str:
-    """
-    Gera um PDF simples com a listagem. Requer 'reportlab'.
-    Se a lib não estiver disponível, lança ImportError.
-    """
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
@@ -158,12 +130,8 @@ def generate_pdf_report(books: Iterable[Any], outfile: str = "exports/relatorio_
         from reportlab.platypus import Table, TableStyle
     except Exception as exc:
         raise ImportError("Para PDF, instale 'reportlab' (pip install reportlab).") from exc
-
     os.makedirs(os.path.dirname(outfile) or ".", exist_ok=True)
-
     normalized = _normalize_books(books)
-
-    # Monta dados da tabela
     data: List[List[str]] = [["ID", "Título", "Autor", "Ano", "Preço (R$)"]]
     for b in normalized:
         preco = b.get("preco", "")
@@ -175,17 +143,12 @@ def generate_pdf_report(books: Iterable[Any], outfile: str = "exports/relatorio_
             str(b.get("ano_publicacao", "") or ""),
             preco_str
         ])
-
     c = canvas.Canvas(outfile, pagesize=A4)
     width, height = A4
-
-    # Título
     c.setFont("Helvetica-Bold", 16)
     c.drawString(40, height - 40, "Relatório de Livros")
     c.setFont("Helvetica", 9)
     c.drawString(40, height - 56, f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} — Total: {len(normalized)}")
-
-    # Tabela
     table = Table(data, colWidths=[40, 220, 160, 60, 70])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111827")),
@@ -198,12 +161,8 @@ def generate_pdf_report(books: Iterable[Any], outfile: str = "exports/relatorio_
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#EEF2FF")]),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
     ]))
-
-    # Calcula altura e posiciona
     table_w, table_h = table.wrapOn(c, width - 80, height - 120)
     table.drawOn(c, 40, height - 90 - table_h)
-
     c.showPage()
     c.save()
-
     return os.path.abspath(outfile)

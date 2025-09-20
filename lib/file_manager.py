@@ -16,9 +16,6 @@ class FileManager:
         self.max_backups = 5
         self.ensure_dirs()
 
-    # -----------------------------
-    # Infra de diretórios e backup
-    # -----------------------------
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.backup_dir, self.exports_dir):
             d.mkdir(parents=True, exist_ok=True)
@@ -27,7 +24,6 @@ class FileManager:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         backup_file = self.backup_dir / f"backup_livraria_{timestamp}.db"
         if not self.db_path.exists():
-            # cria arquivo vazio para garantir que o copy2 funcione
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.db_path, "w", encoding="utf-8"):
                 pass
@@ -47,9 +43,6 @@ class FileManager:
             except Exception as e:
                 print(f"[Aviso] Não foi possível remover backup '{old.name}': {e}")
 
-    # -----------------------------
-    # Utilidades internas (CSV)
-    # -----------------------------
     @staticmethod
     def _normalize_row(item: Any) -> Tuple[Optional[Any], Any, Any, Any, Any]:
         """
@@ -71,14 +64,13 @@ class FileManager:
             if len(item) >= 5:
                 return (item[0], item[1], item[2], item[3], item[4])
             if len(item) == 4:
-                # sem id
                 t, a, y, p = item
                 return (None, t, a, y, p)
-            # ajusta/padroniza para 5 colunas
+
             padded = list(item[:5]) + [None] * max(0, 5 - len(item))
             return (padded[0], padded[1], padded[2], padded[3], padded[4])
 
-        # objeto com atributos
+
         return (
             getattr(item, "id", None),
             getattr(item, "titulo", None),
@@ -92,11 +84,8 @@ class FileManager:
         try:
             return csv.Sniffer().sniff(sample_text, delimiters=",;\t|")
         except Exception:
-            return csv.excel  # padrão: vírgula
+            return csv.excel  
 
-    # -----------------------------
-    # Exportação CSV
-    # -----------------------------
     def export_to_csv(self, books: List[Tuple], outfile_name: str = "livros_exportados.csv") -> Path:
         """
         Exporta livros para CSV de forma consistente.
@@ -119,7 +108,6 @@ class FileManager:
             writer = csv.writer(f)
             writer.writerow(header)
             for r in normalized_rows:
-                # r = (id, titulo, autor, ano, preco)
                 if has_any_id:
                     writer.writerow([r[0], r[1], r[2], r[3], r[4]])
                 else:
@@ -127,9 +115,6 @@ class FileManager:
 
         return path
 
-    # -----------------------------
-    # Leitura CSV genérica
-    # -----------------------------
     def get_csv_data(self, csv_path: str) -> List[dict]:
         """
         Lê um CSV e retorna lista de dicts.
@@ -147,10 +132,6 @@ class FileManager:
             reader = csv.DictReader(f, dialect=dialect)
             return [row for row in reader]
 
-
-# -----------------------------------------
-# Importação para o banco (função livre)
-# -----------------------------------------
 def import_from_csv(db, csv_path: str):
     """
     Lê um CSV e insere no banco.
@@ -170,7 +151,6 @@ def import_from_csv(db, csv_path: str):
     skipped = 0
     errors: List[str] = []
 
-    # Detecta o delimitador
     with p.open("r", encoding="utf-8") as f:
         sample = f.read(4096)
         f.seek(0)
@@ -181,10 +161,8 @@ def import_from_csv(db, csv_path: str):
 
         reader = csv.DictReader(f, dialect=dialect)
         raw_headers = [(h or "").strip() for h in (reader.fieldnames or [])]
-        # mapa: lower -> original
         headers_map = {h.lower(): h for h in raw_headers}
 
-        # Helper para pegar a coluna original a partir de chaves candidatas em lower
         def pick(*keys_lower: str) -> Optional[str]:
             for k in keys_lower:
                 if k in headers_map:
@@ -195,7 +173,6 @@ def import_from_csv(db, csv_path: str):
         col_autor = pick("autor", "author")
         col_ano = pick("ano_publicacao", "ano", "year")
         col_preco = pick("preco", "price")
-        # opcional
         col_id = pick("id")
 
         missing = [name for name, col in {
@@ -210,25 +187,23 @@ def import_from_csv(db, csv_path: str):
             )
             return 0, 0, errors
 
-        for i, row in enumerate(reader, start=2):  # header = linha 1
+        for i, row in enumerate(reader, start=2):
             try:
                 raw_titulo = row.get(col_titulo, "") if col_titulo else ""
                 raw_autor = row.get(col_autor, "") if col_autor else ""
                 raw_ano = row.get(col_ano, "") if col_ano else ""
                 raw_preco = row.get(col_preco, "") if col_preco else ""
 
-                # validações
+
                 titulo = validate_text("Título", raw_titulo)
                 autor = validate_text("Autor", raw_autor)
                 ano = validate_year("Ano de publicação", raw_ano)
 
-                # trata vírgula decimal
                 preco_str = str(raw_preco).replace(" ", "")
                 if "," in preco_str and "." not in preco_str:
                     preco_str = preco_str.replace(",", ".")
                 preco = validate_price("Preço", preco_str)
 
-                # insere (duplicidade é tratada pelo DB se houver índice único)
                 db.add_book(titulo, autor, ano, preco)
                 inserted += 1
 

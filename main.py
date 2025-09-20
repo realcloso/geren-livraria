@@ -1,6 +1,5 @@
 from __future__ import annotations
 from pathlib import Path
-
 from lib.db import DBManager
 from lib.file_manager import FileManager, import_from_csv
 from lib.validators import validate_text, validate_year, validate_price, ValidationError
@@ -14,26 +13,19 @@ class LivrariaCLI:
         self.file_manager = FileManager(BASE_DIR)
         self.db_manager = DBManager(str(self.file_manager.db_path))
 
-    # ------------------------------
-    # CRUD básico
-    # ------------------------------
     def adicionar_livro(self) -> None:
         print("\n=== Adicionar novo livro ===")
         try:
-            # coleta
             titulo_raw = input_nonempty("Título: ")
             autor_raw = input_nonempty("Autor: ")
             ano_raw = input_nonempty("Ano de publicação: ")
             preco_raw = input_nonempty("Preço (ex.: 39.90): ")
 
-            # valida/normaliza
             titulo = validate_text("Título", titulo_raw)
             autor = validate_text("Autor", autor_raw)
             ano = validate_year("Ano de publicação", ano_raw)
-            # aceita vírgula decimal
             preco = validate_price("Preço", str(preco_raw).replace(",", ".").strip())
 
-            # alterações persistentes -> backup
             self.file_manager.backup_db()
             inserted = self.db_manager.add_book(titulo, autor, ano, preco)
             if inserted:
@@ -89,9 +81,6 @@ class LivrariaCLI:
             return
         self._print_books(rows)
 
-    # ------------------------------
-    # CSV (export/import)
-    # ------------------------------
     def exportar_csv(self) -> None:
         print("\n=== Exportar dados para CSV ===")
         books = self.db_manager.get_all_books()
@@ -102,13 +91,11 @@ class LivrariaCLI:
         print("\n=== Importar dados a partir de CSV ===")
         caminho = input_nonempty("Informe o caminho do CSV (ex.: exports/livros_exportados.csv): ")
         try:
-            # usa o importador robusto com validações
             self.file_manager.backup_db()
             inseridos, ignorados, erros = import_from_csv(self.db_manager, caminho)
             print(f"✔ Importação concluída. Inseridos: {inseridos} | Ignorados: {ignorados}")
             if erros:
                 print("— Erros encontrados:")
-                # mostra até 10 para não poluir o terminal
                 for msg in erros[:10]:
                     print("  •", msg)
                 if len(erros) > 10:
@@ -118,9 +105,6 @@ class LivrariaCLI:
         except Exception as e:
             print(f"⚠ Erro durante a importação: {e}")
 
-    # ------------------------------
-    # Backups
-    # ------------------------------
     def fazer_backup_manual(self) -> None:
         path = self.file_manager.backup_db()
         print(f"✔ Backup criado: {path.name}")
@@ -130,9 +114,6 @@ class LivrariaCLI:
         for b in backups:
             print(" -", b.name)
 
-    # ------------------------------
-    # Relatórios
-    # ------------------------------
     def gerar_relatorio_html(self) -> None:
         books = self.db_manager.get_all_books()
         out = self.file_manager.exports_dir / "relatorio_livros.html"
@@ -153,18 +134,12 @@ class LivrariaCLI:
         except Exception as e:
             print(f"⚠ Erro ao gerar PDF: {e}")
 
-    # ------------------------------
-    # Utilitário de impressão
-    # ------------------------------
     def _print_books(self, rows: list):
         print(f"{'ID':<4} {'TÍTULO':<30} {'AUTOR':<22} {'ANO':<6} {'PREÇO':>8}")
         print("-"*76)
         for _id, titulo, autor, ano, preco in rows:
             print(f"{_id:<4} {titulo[:30]:<30} {autor[:22]:<22} {ano:<6} R$ {preco:>7.2f}")
 
-    # ------------------------------
-    # Menu
-    # ------------------------------
     def menu(self) -> None:
         while True:
             print("\n=== Sistema de Gerenciamento de Livraria ===")
