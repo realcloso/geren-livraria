@@ -1,4 +1,12 @@
 def input_int(prompt: str) -> int:
+    """
+    Solicita uma entrada do usuário e garante que o valor seja um número inteiro.
+    O método usa um laço `while True` para continuar pedindo a entrada até que
+    o usuário digite um valor válido. Ele tenta converter a entrada para `int`
+    dentro de um bloco `try...except ValueError`. Se a conversão for bem-sucedida,
+    o valor é retornado; caso contrário, uma mensagem de erro é exibida e o laço
+    continua para uma nova tentativa.
+    """
     while True:
         val = input(prompt).strip()
         try:
@@ -7,6 +15,13 @@ def input_int(prompt: str) -> int:
             print("Valor inválido. Digite um número inteiro.")
 
 def input_float(prompt: str) -> float:
+    """
+    Solicita uma entrada do usuário e garante que o valor seja um número de ponto flutuante.
+    Similar à função `input_int`, ela usa um laço para garantir a validade da entrada.
+    Antes de tentar a conversão para `float`, ela substitui qualquer vírgula (',')
+    por um ponto ('.'), permitindo que o usuário use o separador decimal mais comum
+    em alguns países. Se a conversão falhar, uma mensagem de erro é exibida.
+    """
     while True:
         val = input(prompt).strip().replace(",", ".")
         try:
@@ -15,6 +30,12 @@ def input_float(prompt: str) -> float:
             print("Valor inválido. Digite um número (use '.' para decimais).")
 
 def input_nonempty(prompt: str) -> str:
+    """
+    Solicita uma entrada de string do usuário e garante que o valor não seja vazio.
+    O laço `while True` continua pedindo a entrada até que uma string não vazia seja fornecida.
+    O método `strip()` é usado para remover espaços em branco no início e no fim,
+    evitando que o usuário insira apenas espaços.
+    """
     while True:
         val = input(prompt).strip()
         if val:
