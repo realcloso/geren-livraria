@@ -1,7 +1,9 @@
 from __future__ import annotations
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping, Tuple, Optional, List, Iterable
+
+from . import mapping
 
 
 class ValidationError(ValueError):
@@ -27,51 +29,6 @@ def _coerce_str(value: Any) -> str:
     return str(value).strip()
 
 
-def validate_text(label: str, value: Any, *, min_len: int = 1, max_len: int = 200) -> str:
-    """
-    Valida uma string de texto, como um título ou nome de autor.
-    - O valor é primeiro convertido para string e tem espaços removidos.
-    - Verifica se o comprimento está dentro dos limites `min_len` e `max_len`.
-    - Usa uma expressão regular (`re.search`) para garantir que a string
-      contenha pelo menos uma letra ou número, evitando strings vazias
-      ou compostas apenas por caracteres especiais.
-    - Em caso de falha, lança uma `ValidationError`.
-    - Retorna a string validada e limpa.
-    """
-    s = _coerce_str(value)
-    if len(s) < min_len:
-        raise ValidationError(f"{label} não pode ser vazio.")
-    if len(s) > max_len:
-        raise ValidationError(f"{label} deve ter no máximo {max_len} caracteres.")
-    if not re.search(r"[A-Za-zÀ-ÿ0-9]", s):
-        raise ValidationError(f"{label} parece inválido.")
-    return s
-
-
-def validate_year(label: str, value: Any, *, min_year: int = 1400) -> int:
-    """
-    Valida um valor como um ano.
-    - Primeiro, tenta converter o valor para um número inteiro.
-    - Se a conversão falhar, lança um erro.
-    - Depois, verifica se o ano está dentro de um intervalo razoável,
-      definido por `min_year` e o ano atual mais um (para permitir
-      entradas de livros a serem publicados em breve).
-    - Lança uma `ValidationError` se o ano estiver fora do intervalo.
-    - Retorna o ano validado como um inteiro.
-    """
-    s = _coerce_str(value)
-    if not s:
-        raise ValidationError(f"{label} não pode ser vazio.")
-    try:
-        year = int(s)
-    except Exception:
-        raise ValidationError(f"{label} deve ser um número inteiro (ex.: 1999).")
-    current_plus_one = datetime.now().year + 1
-    if year < min_year or year > current_plus_one:
-        raise ValidationError(f"{label} deve estar entre {min_year} e {current_plus_one}.")
-    return year
-
-
 def _normalize_decimal_str(s: str) -> str:
     """
     Função auxiliar interna para padronizar a string de um número decimal.
@@ -86,17 +43,109 @@ def _normalize_decimal_str(s: str) -> str:
     return s
 
 
+def _normalize_row(item: Any) -> Tuple[Optional[Any], Any, Any, Any, Any]:
+    """
+    Unifica diferentes formatos de dados de livros (dicionários, tuplas,
+    listas ou objetos) em uma tupla consistente com a estrutura
+    (id, titulo, autor, ano_publicacao, preco).
+    """
+    if isinstance(item, Mapping):
+        d = {mapping.KEY_MAP.get(str(k).lower(), k): v for k, v in item.items()}
+        return (
+            d.get("id"),
+            d.get("titulo"),
+            d.get("autor"),
+            d.get("ano_publicacao"),
+            d.get("preco"),
+        )
+
+    if isinstance(item, (list, tuple)):
+        if len(item) >= 5:
+            return (item[0], item[1], item[2], item[3], item[4])
+        if len(item) == 4:
+            t, a, y, p = item
+            return (None, t, a, y, p)
+        padded = list(item[:5]) + [None] * max(0, 5 - len(item))
+        return (padded[0], padded[1], padded[2], padded[3], padded[4])
+
+    return (
+        getattr(item, "id", None),
+        getattr(item, "titulo", None),
+        getattr(item, "autor", None),
+        getattr(item, "ano_publicacao", None),
+        getattr(item, "preco", None),
+    )
+
+
+def _normalize_books(books: Iterable[Any]) -> List[dict]:
+    """
+    Normaliza uma lista de livros de diferentes formatos em uma lista
+    consistente de dicionários, usando o mapeamento centralizado.
+    """
+    normalized: List[dict] = []
+    for item in books:
+        if isinstance(item, Mapping):
+            out = {}
+            for k, v in dict(item).items():
+                kn = mapping.KEY_MAP.get(str(k).lower(), k)
+                out[kn] = v
+            normalized.append({
+                "id": out.get("id"),
+                "titulo": out.get("titulo"),
+                "autor": out.get("autor"),
+                "ano_publicacao": out.get("ano_publicacao"),
+                "preco": out.get("preco"),
+            })
+        elif isinstance(item, (tuple, list)) and len(item) >= 5:
+            normalized.append({
+                "id": item[0], "titulo": item[1], "autor": item[2],
+                "ano_publicacao": item[3], "preco": item[4],
+            })
+        else:
+            normalized.append({
+                "id": getattr(item, "id", None),
+                "titulo": getattr(item, "titulo", None),
+                "autor": getattr(item, "autor", None),
+                "ano_publicacao": getattr(item, "ano_publicacao", None),
+                "preco": getattr(item, "preco", None),
+            })
+    return normalized
+
+
+def validate_text(label: str, value: Any, *, min_len: int = 1, max_len: int = 200) -> str:
+    """
+    Valida uma string de texto, como um título ou nome de autor.
+    """
+    s = _coerce_str(value)
+    if len(s) < min_len:
+        raise ValidationError(f"{label} não pode ser vazio.")
+    if len(s) > max_len:
+        raise ValidationError(f"{label} deve ter no máximo {max_len} caracteres.")
+    if not re.search(r"[A-Za-zÀ-ÿ0-9]", s):
+        raise ValidationError(f"{label} parece inválido.")
+    return s
+
+
+def validate_year(label: str, value: Any, *, min_year: int = 1400) -> int:
+    """
+    Valida um valor como um ano.
+    """
+    s = _coerce_str(value)
+    if not s:
+        raise ValidationError(f"{label} não pode ser vazio.")
+    try:
+        year = int(s)
+    except Exception:
+        raise ValidationError(f"{label} deve ser um número inteiro (ex.: 1999).")
+    current_plus_one = datetime.now().year + 1
+    if year < min_year or year > current_plus_one:
+        raise ValidationError(f"{label} deve estar entre {min_year} e {current_plus_one}.")
+    return year
+
+
 def validate_price(label: str, value: Any, *, min_value: float = 0.0, max_value: float = 1_000_000.0) -> float:
     """
     Valida um valor como um preço.
-    - Primeiro, a string é normalizada usando `_normalize_decimal_str`
-      para lidar com a vírgula como separador decimal.
-    - Tenta converter a string normalizada para um `float`.
-    - Verifica se o preço está dentro de um intervalo válido,
-      definido por `min_value` e `max_value`.
-    - O valor final é arredondado para duas casas decimais.
-    - Em caso de erro, uma `ValidationError` é lançada com uma mensagem descritiva.
-    - Retorna o preço validado como um float.
     """
     s = _coerce_str(value)
     if not s:
