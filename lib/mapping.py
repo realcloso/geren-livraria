@@ -1,5 +1,5 @@
 # Mapeia sinônimos de chaves/cabeçalhos para um padrão unificado.
-# Usado para normalizar dicionários e objetos.
+# normaliza dicionários e objetos.
 KEY_MAP = {
     "id": "id",
     "titulo": "titulo",

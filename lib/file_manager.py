@@ -57,6 +57,10 @@ class FileManager:
             except Exception as e:
                 print(f"[Aviso] Não foi possível remover backup '{old.name}': {e}")
 
+
+# A anotação @staticmethod em Python transforma uma função dentro de uma classe em um método estático, ou seja:
+# Ele não recebe automaticamente o parâmetro self (instância da classe) nem cls (classe).
+# Funciona como uma função normal, mas fica organizada dentro da classe, porque faz sentido conceitualmente estar ligada a ela.
     @staticmethod
     def _detect_dialect(sample_text: str) -> csv.Dialect:
         """

@@ -14,20 +14,6 @@ def input_int(prompt: str) -> int:
         except ValueError:
             print("Valor inválido. Digite um número inteiro.")
 
-def input_float(prompt: str) -> float:
-    """
-    Solicita uma entrada do usuário e garante que o valor seja um número de ponto flutuante.
-    Similar à função `input_int`, ela usa um laço para garantir a validade da entrada.
-    Antes de tentar a conversão para `float`, ela substitui qualquer vírgula (',')
-    por um ponto ('.'), permitindo que o usuário use o separador decimal mais comum
-    em alguns países. Se a conversão falhar, uma mensagem de erro é exibida.
-    """
-    while True:
-        val = input(prompt).strip().replace(",", ".")
-        try:
-            return float(val)
-        except ValueError:
-            print("Valor inválido. Digite um número (use '.' para decimais).")
 
 def input_nonempty(prompt: str) -> str:
     """
